@@ -472,10 +472,16 @@ async function toggleAudio() {
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     try {
+      const deviceId = document.getElementById('input-picker').value;
+      const audioConstraints = {
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        ...(deviceId ? {deviceId: {exact: deviceId}} : {})
+      };
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false},
-        video:false
+        audio: audioConstraints, video: false
       });
+      // Permission now granted — repopulate picker with real device labels
+      await populateInputPicker();
     } catch(e) {
       throw new Error('Mic denied -- Settings → Privacy → Microphone → Safari → On');
     }
