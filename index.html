@@ -473,19 +473,33 @@ async function toggleAudio() {
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     try {
+      // Request mic with no deviceId first — Safari is most reliable this way.
+      // We apply the device hint only if a specific one was chosen AND it's not
+      // the default (empty string from the placeholder option).
       const deviceId = document.getElementById('input-picker').value;
       const audioConstraints = {
         echoCancellation: false, noiseSuppression: false, autoGainControl: false,
-        ...(deviceId ? {deviceId: deviceId} : {})  // hint only, not exact
+        ...(deviceId ? {deviceId: deviceId} : {})
       };
       micStream = await navigator.mediaDevices.getUserMedia({
         audio: audioConstraints, video: false
       });
+      // Safari: wait for the audio track to reach 'live' state before connecting
+      const track = micStream.getAudioTracks()[0];
+      if (track && track.readyState !== 'live') {
+        await new Promise(resolve => {
+          track.addEventListener('unmute', resolve, {once:true});
+          setTimeout(resolve, 500); // fallback timeout
+        });
+      }
       // Permission now granted — repopulate picker with real device labels
       await populateInputPicker();
     } catch(e) {
       throw new Error('Mic denied -- Settings → Privacy → Microphone → Safari → On');
     }
+
+    // Safari: ensure AudioContext is running AFTER stream is acquired
+    if (audioCtx.state !== 'running') await audioCtx.resume();
 
     const src = audioCtx.createMediaStreamSource(micStream);
 
@@ -493,6 +507,19 @@ async function toggleAudio() {
     inAnalyser.fftSize = 256;
     inAnalyser.smoothingTimeConstant = 0;
     src.connect(inAnalyser);
+
+    // Safari fallback: ScriptProcessorNode sees audio even when AnalyserNode
+    // returns zeros from a MediaStreamSource. We use it purely for RMS metering.
+    let scriptRms = 0;
+    const scriptProc = audioCtx.createScriptProcessor(256, 1, 1);
+    scriptProc.onaudioprocess = e => {
+      const buf = e.inputBuffer.getChannelData(0);
+      let sum = 0;
+      for (let k = 0; k < buf.length; k++) sum += buf[k] * buf[k];
+      scriptRms = Math.sqrt(sum / buf.length);
+    };
+    src.connect(scriptProc);
+    scriptProc.connect(audioCtx.destination); // must be connected to run
 
     // ── Noise gate ────────────────────────────────────────────────────────────
     // Single GainNode between mic source and all downstream paths.
@@ -578,7 +605,8 @@ async function toggleAudio() {
     const strBufs=Array.from({length:6},(_,i)=>new Float32Array(strAnalysers[i].fftSize));
     rmsTimer = setInterval(()=>{
       inAnalyser.getFloatTimeDomainData(inBuf);
-      const inRms=rms(inBuf);
+      const analyserRms = rms(inBuf);
+      const inRms = Math.max(analyserRms, scriptRms); // Safari fallback
       setLED('led-mic', inRms>0.001, GREEN);
       const rmsEl = document.getElementById('rms-readout');
       if (rmsEl) rmsEl.textContent = inRms.toFixed(4);
