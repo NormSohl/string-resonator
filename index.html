@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-16x -->
+<!-- Multi-String Resonator v2026-06-16y -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -197,7 +197,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16x</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16y</div>
     </div>
   </div>
 
@@ -553,9 +553,7 @@ async function toggleAudio() {
     // this brings excitation down to a sane operating point.
     const inputTrim = audioCtx.createGain();
     inputTrim.gain.value = 0.08;
-
-    // Pre-compute limiter curve (shared across all strings)
-    const limiterCurve = makeLimiterCurve(4096);
+    inputGateNode.connect(inputTrim);
 
     perString.length=0;
     for (let i=0;i<6;i++) {
@@ -563,44 +561,33 @@ async function toggleAudio() {
 
       const delay=audioCtx.createDelay(2.0); delay.delayTime.value=1/s.pitch;
 
-      // ── FIX 3: DC blocking highpass at 20 Hz after the delay ─────────────
-      // Removes DC offset accumulation that would walk the feedback loop's
-      // operating point away from zero and eventually saturate.
+      // DC blocking highpass — prevents DC offset from accumulating in the
+      // feedback loop and walking the operating point off-center.
       const dcBlock = audioCtx.createBiquadFilter();
       dcBlock.type = 'highpass';
-      dcBlock.frequency.value = 20;   // Hz — below any audible content
-      dcBlock.Q.value = 0.707;        // Butterworth (maximally flat passband)
+      dcBlock.frequency.value = 20;
+      dcBlock.Q.value = 0.707;
 
       const damper=audioCtx.createBiquadFilter(); damper.type='lowpass'; damper.frequency.value=s.damping;
-
-      // ── FIX 2: Hard limiter WaveShaperNode in the feedback path ──────────
-      // Sits between damper output and feedback gain to prevent runaway.
-      const limiter = audioCtx.createWaveShaper();
-      limiter.curve = limiterCurve;
-      limiter.oversample = '4x';  // reduces aliasing from the nonlinearity
 
       const feedback=audioCtx.createGain(); feedback.gain.value = s.active ? s.decay : 0;
       const wetGain=audioCtx.createGain(); wetGain.gain.value=s.active?masterWet/6:0;
 
-      // Feedback loop: delay → dcBlock → damper → limiter → feedback → delay
-      // (dcBlock and limiter are in the loop; wetGain taps off post-damper)
-      inputGateNode.connect(inputTrim);
+      // Minimal comb filter loop: delay → dcBlock → damper → feedback → delay
       inputTrim.connect(delay);
       delay.connect(dcBlock);
       dcBlock.connect(damper);
-      damper.connect(limiter);
-      limiter.connect(feedback);
+      damper.connect(feedback);
       feedback.connect(delay);
 
-      // Wet tap comes from post-damper (same as before), before the limiter
-      // so the output still reflects the natural string tone.
+      // Wet tap off post-damper
       damper.connect(wetGain);
       wetGain.connect(masterGainNode);
 
       const an=audioCtx.createAnalyser(); an.fftSize=512;
       damper.connect(an); strAnalysers[i]=an;
 
-      perString.push({delay, dcBlock, damper, limiter, feedback, wetGain});
+      perString.push({delay, dcBlock, damper, feedback, wetGain});
     }
 
     // RMS LEDs + anti-runaway watchdog
