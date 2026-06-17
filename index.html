@@ -61,7 +61,7 @@ body {
 }
 
 #input-picker-wrap {
-  display: flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0;
+  display: none; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0;
 }
 #input-picker-label {
   font-family: 'Share Tech Mono', monospace; font-size: 9px;
@@ -191,7 +191,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16f</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16h</div>
     </div>
   </div>
 
@@ -493,8 +493,9 @@ async function toggleAudio() {
           setTimeout(resolve, 500);
         });
       }
-      // Now repopulate picker with real device labels
+      // Now repopulate picker with real device labels and show it
       await populateInputPicker();
+      document.getElementById('input-picker-wrap').style.display = 'flex';
       // Show which device we actually got
       const activeLabel = track ? track.label : 'unknown';
       document.getElementById('input-picker-label').textContent =
@@ -509,22 +510,14 @@ async function toggleAudio() {
     const src = audioCtx.createMediaStreamSource(micStream);
 
     const inAnalyser = audioCtx.createAnalyser();
-    inAnalyser.fftSize = 256;
+    inAnalyser.fftSize = 512;
     inAnalyser.smoothingTimeConstant = 0;
-    src.connect(inAnalyser);
-
-    // Safari fallback: ScriptProcessorNode sees audio even when AnalyserNode
-    // returns zeros from a MediaStreamSource. We use it purely for RMS metering.
-    let scriptRms = 0;
-    const scriptProc = audioCtx.createScriptProcessor(256, 1, 1);
-    scriptProc.onaudioprocess = e => {
-      const buf = e.inputBuffer.getChannelData(0);
-      let sum = 0;
-      for (let k = 0; k < buf.length; k++) sum += buf[k] * buf[k];
-      scriptRms = Math.sqrt(sum / buf.length);
-    };
-    src.connect(scriptProc);
-    scriptProc.connect(audioCtx.destination); // must be connected to run
+    // Connect through a silent gain so Safari actually processes the analyser
+    const meterGain = audioCtx.createGain();
+    meterGain.gain.value = 0;
+    src.connect(meterGain);
+    meterGain.connect(inAnalyser);
+    inAnalyser.connect(audioCtx.destination);
 
     // ── Noise gate ────────────────────────────────────────────────────────────
     // Single GainNode between mic source and all downstream paths.
@@ -610,8 +603,7 @@ async function toggleAudio() {
     const strBufs=Array.from({length:6},(_,i)=>new Float32Array(strAnalysers[i].fftSize));
     rmsTimer = setInterval(()=>{
       inAnalyser.getFloatTimeDomainData(inBuf);
-      const analyserRms = rms(inBuf);
-      const inRms = Math.max(analyserRms, scriptRms); // Safari fallback
+      const inRms = rms(inBuf);
       setLED('led-mic', inRms>0.001, GREEN);
       const rmsEl = document.getElementById('rms-readout');
       if (rmsEl) rmsEl.textContent = `MIC: ${inRms.toFixed(4)}`;
@@ -655,6 +647,8 @@ function stopAudio() {
   micStream?.getTracks().forEach(t=>t.stop()); micStream=null;
   audioCtx?.close(); audioCtx=null;
   masterGainNode=null; dryGainNode=null; masterAnalyser=null; masterCompressor=null; inputGateNode=null;
+  document.getElementById('input-picker-wrap').style.display = 'none';
+  document.getElementById('input-picker-label').textContent = 'IN';
   perString.length=0;
   for(let i=0;i<6;i++) strAnalysers[i]=null;
   const btn=document.getElementById('engage-btn');
