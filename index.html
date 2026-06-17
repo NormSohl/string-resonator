@@ -60,6 +60,23 @@ body {
   -webkit-appearance: none; white-space: nowrap;
 }
 
+#input-picker-wrap {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0;
+}
+#input-picker-label {
+  font-family: 'Share Tech Mono', monospace; font-size: 9px;
+  color: #8a8480; letter-spacing: 2px; white-space: nowrap; flex-shrink: 0;
+}
+#input-picker {
+  font-family: 'Share Tech Mono', monospace; font-size: 10px;
+  background: #1a1a1a; border: 1px solid #3a3630;
+  border-radius: 4px; color: #c8c0b0;
+  padding: 5px 8px; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  min-width: 0; flex: 1; max-width: 200px;
+  text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+}
+
 /* MAIN CONTENT -- flex row */
 #main {
   flex: 1; display: flex; overflow: hidden; min-height: 0;
@@ -145,6 +162,10 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
     </div>
     <div id="topbar-right">
       <span id="error-msg"></span>
+      <div id="input-picker-wrap">
+        <span id="input-picker-label">IN</span>
+        <select id="input-picker"><option value="">— select mic —</option></select>
+      </div>
       <div class="indicator"><span class="ind-label">MIC</span><div class="led" id="led-mic"></div></div>
       <div class="indicator"><span class="ind-label">RUN</span><div class="led" id="led-run"></div></div>
       <button id="engage-btn">▶ ENGAGE</button>
@@ -671,6 +692,36 @@ function showError(msg){
   const el=document.getElementById('error-msg');
   el.textContent=msg; el.style.display=msg?'block':'none';
 }
+
+// ── Input device picker ───────────────────────────────────────────────────────
+async function populateInputPicker() {
+  const picker = document.getElementById('input-picker');
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs  = devices.filter(d => d.kind === 'audioinput');
+    const current = picker.value;
+    picker.innerHTML = '';
+    inputs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      // Label falls back to a numbered name if browser withholds it pre-permission
+      opt.textContent = d.label || `Microphone ${picker.options.length + 1}`;
+      picker.appendChild(opt);
+    });
+    // Restore previous selection if still available, else prefer built-in
+    if (current && [...picker.options].some(o => o.value === current)) {
+      picker.value = current;
+    } else {
+      const builtIn = inputs.findIndex(d => /built.in|internal/i.test(d.label));
+      if (builtIn >= 0) picker.selectedIndex = builtIn;
+    }
+  } catch(e) { /* enumerateDevices not available — picker stays empty */ }
+}
+
+// Enumerate on load (labels may be blank until permission granted)
+populateInputPicker();
+// Re-enumerate if devices change (e.g. USB-C adapter plugged in/out)
+navigator.mediaDevices.addEventListener('devicechange', populateInputPicker);
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 buildUI();
