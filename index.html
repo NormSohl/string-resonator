@@ -166,7 +166,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <span id="input-picker-label">IN</span>
         <select id="input-picker"><option value="">— select mic —</option></select>
       </div>
-      <div class="indicator"><span class="ind-label">MIC</span><div class="led" id="led-mic"></div></div>
+      <div class="indicator"><span class="ind-label">MIC</span><div class="led" id="led-mic"></div><span id="rms-readout" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#8a8480;min-width:40px;">--</span></div>
       <div class="indicator"><span class="ind-label">RUN</span><div class="led" id="led-run"></div></div>
       <button id="engage-btn">▶ ENGAGE</button>
     </div>
@@ -248,7 +248,7 @@ let masterCompressor=null;
 // ── Noise gate: single GainNode on the input, driven by RMS poll ──────────────
 let inputGateNode=null;
 let gateGain=0;          // current smoothed gate value (0–1)
-const GATE_THRESH  = 0.008;  // RMS threshold to open gate (~−42 dBFS)
+const GATE_THRESH  = 0.0005;  // RMS threshold — lowered for diagnostics
 const GATE_ATTACK  = 0.15;   // attack  time constant (seconds, per 60 ms tick)
 const GATE_RELEASE = 0.05;   // release time constant (seconds, per 60 ms tick)
 // Derived per-tick coefficients (tick = 60 ms = 0.06 s)
@@ -579,6 +579,8 @@ async function toggleAudio() {
       inAnalyser.getFloatTimeDomainData(inBuf);
       const inRms=rms(inBuf);
       setLED('led-mic', inRms>0.001, GREEN);
+      const rmsEl = document.getElementById('rms-readout');
+      if (rmsEl) rmsEl.textContent = inRms.toFixed(4);
 
       // ── Gate envelope: attack when signal present, release when silent ──
       const target = inRms > GATE_THRESH ? 1 : 0;
@@ -734,3 +736,4 @@ buildUI();
 </script>
 </body>
 </html>
+
