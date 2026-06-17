@@ -447,7 +447,7 @@ async function toggleAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) throw new Error('Web Audio API not available.');
 
-    audioCtx = new AC({sampleRate:44100});
+    audioCtx = new AC();
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     try {
@@ -461,7 +461,9 @@ async function toggleAudio() {
 
     const src = audioCtx.createMediaStreamSource(micStream);
 
-    const inAnalyser = audioCtx.createAnalyser(); inAnalyser.fftSize=256;
+    const inAnalyser = audioCtx.createAnalyser();
+    inAnalyser.fftSize = 256;
+    inAnalyser.smoothingTimeConstant = 0;
     src.connect(inAnalyser);
 
     // ── Noise gate ────────────────────────────────────────────────────────────
@@ -549,7 +551,7 @@ async function toggleAudio() {
     rmsTimer = setInterval(()=>{
       inAnalyser.getFloatTimeDomainData(inBuf);
       const inRms=rms(inBuf);
-      setLED('led-mic', inRms>0.003, GREEN);
+      setLED('led-mic', inRms>0.001, GREEN);
 
       // ── Gate envelope: attack when signal present, release when silent ──
       const target = inRms > GATE_THRESH ? 1 : 0;
