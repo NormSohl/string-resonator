@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -191,7 +191,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16l</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16m</div>
     </div>
   </div>
 
@@ -263,9 +263,9 @@ let masterCompressor=null;
 // ── Noise gate: single GainNode on the input, driven by RMS poll ──────────────
 let inputGateNode=null;
 let gateGain=0;          // current smoothed gate value (0–1)
-const GATE_THRESH  = 0.0005;  // RMS threshold — lowered for diagnostics
-const GATE_ATTACK  = 0.15;   // attack  time constant (seconds, per 60 ms tick)
-const GATE_RELEASE = 0.05;   // release time constant (seconds, per 60 ms tick)
+const GATE_THRESH  = 0.002;  // RMS threshold — tuned for iPad built-in mic
+const GATE_ATTACK  = 0.05;   // attack  time constant — fast open
+const GATE_RELEASE = 0.8;    // release time constant — slow close, lets strings ring
 // Derived per-tick coefficients (tick = 60 ms = 0.06 s)
 const GATE_ATK_COEF = Math.exp(-0.06 / GATE_ATTACK);   // ≈ 0.67
 const GATE_REL_COEF = Math.exp(-0.06 / GATE_RELEASE);  // ≈ 0.30
