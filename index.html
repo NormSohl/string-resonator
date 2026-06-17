@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="String Resonator">
+<meta name="theme-color" content="#080808">
+<title>String Resonator</title>
+<!-- Inline SVG icon for home screen -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23111111'/%3E%3C!-- 6 strings --%3E%3Cline x1='30' y1='50' x2='150' y2='50' stroke='%23ff5533' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='66' x2='150' y2='66' stroke='%23e8920a' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='82' x2='150' y2='82' stroke='%23c8e80a' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='98' x2='150' y2='98' stroke='%230ae84a' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='114' x2='150' y2='114' stroke='%230ae8c8' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='130' x2='150' y2='130' stroke='%233a8aff' stroke-width='3' stroke-linecap='round'/%3E%3C!-- Waveform on string 4 --%3E%3Cpolyline points='30,98 50,88 65,108 80,88 95,108 110,88 125,108 150,98' fill='none' stroke='%230ae84a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: -webkit-fill-available; }
+body {
+  width: 100%; min-height: 100vh;
+  min-height: -webkit-fill-available;
+  overflow: hidden; background: #080808;
+  font-family: 'Barlow', sans-serif;
+}
+
+#app {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column;
+  background: #080808; overflow: hidden;
+}
+
+/* TOP BAR */
+#topbar {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid #242424;
+  background: #111111; gap: 12px;
+}
+#topbar-left { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
+#topbar-eyebrow { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: #5a3804; letter-spacing: 4px; white-space: nowrap; }
+#topbar-title { font-size: 18px; font-weight: 700; color: #c8c0b0; letter-spacing: -0.5px; white-space: nowrap; }
+#topbar-right { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
+#error-msg { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: #ff4444; max-width: 240px; text-align: right; display: none; line-height: 1.4; }
+
+.indicator { display: flex; align-items: center; gap: 6px; }
+.ind-label { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: #3a3630; letter-spacing: 2px; }
+.led {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #111; border: 1px solid #242424;
+  transition: background 0.08s, box-shadow 0.08s, border-color 0.08s;
+  flex-shrink: 0;
+}
+
+#engage-btn {
+  padding: 8px 20px;
+  background: rgba(232,146,10,0.10);
+  border: 1px solid #e8920a;
+  border-radius: 4px; color: #e8920a;
+  font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 3px;
+  cursor: pointer; transition: all 0.15s;
+  -webkit-appearance: none; white-space: nowrap;
+}
+
+/* MAIN CONTENT -- flex row */
+#main {
+  flex: 1; display: flex; overflow: hidden; min-height: 0;
+}
+
+/* STRING COLUMN */
+#strings-col {
+  flex: 1; display: flex; flex-direction: column;
+  padding: 8px 10px 8px 14px; gap: 5px; overflow: hidden; min-width: 0;
+}
+
+.string-row {
+  flex: 1; display: flex; align-items: center;
+  gap: 8px; min-height: 0;
+  background: #111111; border: 1px solid #242424;
+  border-radius: 6px; padding: 0 10px 0 8px;
+  transition: border-color 0.15s, opacity 0.2s; overflow: hidden;
+}
+.string-row.muted { opacity: 0.4; }
+
+.str-label-col {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 5px; flex-shrink: 0; width: 26px;
+}
+.str-toggle {
+  font-family: 'Share Tech Mono', monospace; font-size: 10px;
+  background: transparent; border: none; cursor: pointer;
+  letter-spacing: 1px; padding: 2px 0; line-height: 1;
+  -webkit-appearance: none;
+}
+
+.scope-wrap {
+  flex: 1; align-self: stretch;
+  display: flex; align-items: center;
+  padding: 6px 0; min-width: 0;
+}
+canvas.scope {
+  width: 100%; height: 100%; display: block;
+  border-radius: 3px; border: 1px solid #242424;
+  background: #040a04; min-height: 30px;
+}
+
+.knobs-group { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.knob-col { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 52px; }
+.knob-val { font-family: 'Share Tech Mono', monospace; font-size: 8px; line-height: 1.2; }
+.knob-lbl { font-family: 'Share Tech Mono', monospace; font-size: 6px; color: #3a3630; letter-spacing: 1px; }
+svg.knob { cursor: ns-resize; touch-action: none; display: block; flex-shrink: 0; -webkit-user-select: none; user-select: none; }
+
+/* RIGHT PANEL */
+#right-panel {
+  width: 190px; flex-shrink: 0;
+  border-left: 1px solid #242424; background: #111111;
+  display: flex; flex-direction: column;
+  padding: 12px; gap: 12px; overflow: hidden;
+}
+#master-scope-wrap { height: 80px; flex-shrink: 0; }
+canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 4px; border: 1px solid #0f2e0f; background: #040a04; }
+.divider { width: 100%; height: 1px; background: #242424; flex-shrink: 0; }
+.master-knob-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.master-knob-val { font-family: 'Share Tech Mono', monospace; font-size: 12px; }
+.master-knob-lbl { font-family: 'Share Tech Mono', monospace; font-size: 7px; color: #3a3630; letter-spacing: 2px; }
+#panel-credits { font-family: 'Share Tech Mono', monospace; font-size: 6px; color: #3a3630; letter-spacing: 1px; text-align: center; line-height: 1.8; margin-top: auto; }
+
+/* BOTTOM BAR */
+#bottombar {
+  flex-shrink: 0;
+  border-top: 1px solid #242424; background: #111111;
+  padding: 5px 18px; display: flex; justify-content: space-between; align-items: center;
+}
+#bottom-hint { font-family: 'Share Tech Mono', monospace; font-size: 7px; color: #3a3630; letter-spacing: 2px; }
+#bottom-leds { display: flex; gap: 10px; }
+.bottom-string { display: flex; align-items: center; gap: 4px; }
+.bottom-note { font-family: 'Share Tech Mono', monospace; font-size: 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div id="topbar-left">
+      <span id="topbar-eyebrow">RESONANT SYSTEMS · MK II</span>
+      <span id="topbar-title">Multi-String Resonator</span>
+    </div>
+    <div id="topbar-right">
+      <span id="error-msg"></span>
+      <div class="indicator"><span class="ind-label">MIC</span><div class="led" id="led-mic"></div></div>
+      <div class="indicator"><span class="ind-label">RUN</span><div class="led" id="led-run"></div></div>
+      <button id="engage-btn">▶ ENGAGE</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="strings-col"></div>
+
+    <div id="right-panel">
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:7px;color:#3a3630;letter-spacing:3px;margin-bottom:6px;">MASTER OUT</div>
+        <div id="master-scope-wrap"><canvas id="master-scope" width="300" height="160"></canvas></div>
+      </div>
+      <div class="divider"></div>
+      <div class="master-knob-col">
+        <svg class="knob" id="knob-wet" width="54" height="54" viewBox="0 0 54 54"></svg>
+        <div class="master-knob-val" id="val-wet" style="color:#0ae8c8">75%</div>
+        <div class="master-knob-lbl">WET MIX</div>
+      </div>
+      <div class="master-knob-col">
+        <svg class="knob" id="knob-gain" width="54" height="54" viewBox="0 0 54 54"></svg>
+        <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
+        <div class="master-knob-lbl">OUTPUT</div>
+      </div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO</div>
+    </div>
+  </div>
+
+  <div id="bottombar">
+    <span id="bottom-hint">TUNED E₂ A₂ D₃ G₃ B₃ E₄ · TAP NUMERAL TO MUTE</span>
+    <div id="bottom-leds"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const BG       = '#080808';
+const SCOPE_BG = '#040a04';
+const BORDER   = '#242424';
+const AMBER    = '#e8920a';
+const GREEN    = '#2ecc71';
+
+const STRING_COLORS = [
+  {wave:'#ff5533', glow:'rgba(255,85,51,0.7)'},
+  {wave:'#e8920a', glow:'rgba(232,146,10,0.7)'},
+  {wave:'#c8e80a', glow:'rgba(200,232,10,0.7)'},
+  {wave:'#0ae84a', glow:'rgba(10,232,74,0.7)'},
+  {wave:'#0ae8c8', glow:'rgba(10,232,200,0.7)'},
+  {wave:'#3a8aff', glow:'rgba(58,138,255,0.7)'},
+];
+const LABELS = ['I','II','III','IV','V','VI'];
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function hzToNote(hz) {
+  const midi = Math.round(12 * Math.log2(Math.max(hz,1)/440) + 69);
+  return NOTE_NAMES[((midi%12)+12)%12] + (Math.floor(midi/12)-1);
+}
+function fmtDamp(v) { return v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)+''; }
+
+const strings = [
+  {pitch:82.4,  decay:0.97, damping:3200, active:true},
+  {pitch:110.0, decay:0.96, damping:2900, active:true},
+  {pitch:146.8, decay:0.95, damping:2600, active:true},
+  {pitch:196.0, decay:0.94, damping:2400, active:true},
+  {pitch:246.9, decay:0.93, damping:2200, active:true},
+  {pitch:329.6, decay:0.92, damping:2000, active:true},
+];
+let masterWet  = 0.75;
+let masterGain = 0.85;
+
+// Audio nodes
+let audioCtx=null, micStream=null, rmsTimer=null, scopeRAF=null;
+let masterGainNode=null, dryGainNode=null, masterAnalyser=null;
+const perString    = [];
+const strAnalysers = Array(6).fill(null);
+
+// ── LED helper ────────────────────────────────────────────────────────────────
+function setLED(id, on, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.background   = on ? color : '#111';
+  el.style.boxShadow    = on ? `0 0 7px 2px ${color}` : 'none';
+  el.style.borderColor  = on ? color : BORDER;
+}
+
+// ── Knob SVG ──────────────────────────────────────────────────────────────────
+function drawKnob(svg, val, min, max, color, sz) {
+  const norm  = Math.max(0, Math.min(1, (val-min)/(max-min)));
+  const angle = -135 + norm*270;
+  const r  = sz/2 - 7;
+  const cx = sz/2, cy = sz/2;
+  const t  = 2*Math.PI*r;
+  svg.innerHTML = `
+    <circle cx="${cx}" cy="${cy}" r="${r+5}" fill="#1c1c1c" stroke="${BORDER}" stroke-width="1"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#5a3804" stroke-width="2.5"
+      stroke-dasharray="${t*0.75} ${t*0.25}" stroke-dashoffset="${t*0.125}"
+      stroke-linecap="round" transform="rotate(135 ${cx} ${cy})"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="2.5"
+      stroke-dasharray="${t*0.75*norm} ${t}" stroke-dashoffset="${t*0.125}"
+      stroke-linecap="round" transform="rotate(135 ${cx} ${cy})"
+      style="filter:drop-shadow(0 0 3px ${color})"/>
+    <line x1="${cx}" y1="${cy}"
+      x2="${cx+(r-2)*Math.sin(angle*Math.PI/180)}"
+      y2="${cy-(r-2)*Math.cos(angle*Math.PI/180)}"
+      stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="3.5" fill="${BG}" stroke="${color}" stroke-width="1"/>`;
+}
+
+function attachKnob(svg, getVal, setVal, min, max, step, color, sz, onUpdate) {
+  let dragging=false, startY=0, startVal=0;
+  svg.addEventListener('pointerdown', e => {
+    dragging=true; startY=e.clientY; startVal=getVal();
+    svg.setPointerCapture(e.pointerId); e.preventDefault();
+  }, {passive:false});
+  svg.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dy = startY - e.clientY;
+    let nv = Math.min(max, Math.max(min, startVal + (dy/110)*(max-min)));
+    nv = step < 1 ? parseFloat(nv.toFixed(4)) : Math.round(nv/step)*step;
+    setVal(nv);
+    drawKnob(svg, nv, min, max, color, sz);
+    onUpdate(nv);
+  });
+  svg.addEventListener('pointerup', () => { dragging=false; });
+  svg.addEventListener('pointercancel', () => { dragging=false; });
+}
+
+// ── Build DOM ─────────────────────────────────────────────────────────────────
+function buildUI() {
+  const col = document.getElementById('strings-col');
+  const botLeds = document.getElementById('bottom-leds');
+
+  strings.forEach((s, i) => {
+    const sc = STRING_COLORS[i];
+
+    // Row
+    const row = document.createElement('div');
+    row.className = 'string-row';
+    row.id = `row-${i}`;
+
+    // Label col
+    const lc = document.createElement('div');
+    lc.className = 'str-label-col';
+    const led = document.createElement('div');
+    led.className = 'led'; led.id = `led-str-${i}`;
+    const btn = document.createElement('button');
+    btn.className = 'str-toggle'; btn.textContent = LABELS[i];
+    btn.style.color = sc.wave;
+    btn.addEventListener('click', () => toggleString(i));
+    lc.appendChild(led); lc.appendChild(btn);
+
+    // Scope
+    const sw = document.createElement('div');
+    sw.className = 'scope-wrap';
+    const canvas = document.createElement('canvas');
+    canvas.className = 'scope'; canvas.id = `scope-${i}`;
+    canvas.width=400; canvas.height=120;
+    sw.appendChild(canvas);
+
+    // Knobs
+    const kg = document.createElement('div');
+    kg.className = 'knobs-group';
+
+    const knobDefs = [
+      {key:'pitch',   min:30,  max:900,  step:0.1,  label:'PITCH', fmt:v=>hzToNote(v)},
+      {key:'decay',   min:0.5, max:0.999,step:0.001,label:'DECAY', fmt:v=>v.toFixed(3)},
+      {key:'damping', min:200, max:8000, step:10,   label:'DAMP',  fmt:v=>fmtDamp(v)},
+    ];
+
+    knobDefs.forEach(def => {
+      const kc = document.createElement('div');
+      kc.className = 'knob-col';
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('class','knob');
+      svg.setAttribute('width','44'); svg.setAttribute('height','44');
+      svg.setAttribute('viewBox','0 0 44 44');
+      drawKnob(svg, s[def.key], def.min, def.max, sc.wave, 44);
+
+      const valEl = document.createElement('div');
+      valEl.className = 'knob-val'; valEl.style.color = sc.wave;
+      valEl.id = `val-${i}-${def.key}`;
+      valEl.textContent = def.fmt(s[def.key]);
+
+      const lblEl = document.createElement('div');
+      lblEl.className = 'knob-lbl'; lblEl.textContent = def.label;
+
+      attachKnob(svg,
+        () => strings[i][def.key],
+        v  => { strings[i][def.key]=v; },
+        def.min, def.max, def.step, sc.wave, 44,
+        v => {
+          valEl.textContent = def.fmt(v);
+          if (def.key==='pitch') {
+            const nb = document.getElementById(`note-bot-${i}`);
+            if (nb) nb.textContent = hzToNote(v);
+          }
+          syncAudioParams();
+        }
+      );
+
+      kc.appendChild(svg); kc.appendChild(valEl); kc.appendChild(lblEl);
+      kg.appendChild(kc);
+    });
+
+    row.appendChild(lc); row.appendChild(sw); row.appendChild(kg);
+    col.appendChild(row);
+
+    // Blank scope
+    blankScope(canvas);
+
+    // Bottom LED
+    const bd = document.createElement('div'); bd.className='bottom-string';
+    const bl = document.createElement('div'); bl.className='led'; bl.id=`led-bot-${i}`;
+    const bn = document.createElement('span'); bn.className='bottom-note';
+    bn.id=`note-bot-${i}`; bn.style.color=sc.wave; bn.textContent=hzToNote(s.pitch);
+    bd.appendChild(bl); bd.appendChild(bn);
+    botLeds.appendChild(bd);
+  });
+
+  // Master knobs
+  const wetSvg = document.getElementById('knob-wet');
+  drawKnob(wetSvg, masterWet, 0, 1, '#0ae8c8', 54);
+  attachKnob(wetSvg, ()=>masterWet, v=>{masterWet=v;}, 0, 1, 0.01, '#0ae8c8', 54, v=>{
+    document.getElementById('val-wet').textContent = Math.round(v*100)+'%';
+    syncAudioParams();
+  });
+
+  const gainSvg = document.getElementById('knob-gain');
+  drawKnob(gainSvg, masterGain, 0, 1.5, AMBER, 54);
+  attachKnob(gainSvg, ()=>masterGain, v=>{masterGain=v;}, 0, 1.5, 0.01, AMBER, 54, v=>{
+    document.getElementById('val-gain').textContent = Math.round(v*100)+'%';
+    syncAudioParams();
+  });
+
+  // Engage button
+  document.getElementById('engage-btn').addEventListener('click', toggleAudio);
+}
+
+// ── Toggle string ────────────────────────────────────────────────────────────
+function toggleString(i) {
+  strings[i].active = !strings[i].active;
+  const on = strings[i].active;
+  document.getElementById(`row-${i}`).style.opacity = on ? '1' : '0.4';
+  const btn = document.querySelector(`#row-${i} .str-toggle`);
+  btn.style.color = on ? STRING_COLORS[i].wave : '#3a3630';
+  const nb = document.getElementById(`note-bot-${i}`);
+  if (nb) nb.style.opacity = on ? '1' : '0.3';
+  syncAudioParams();
+}
+
+// ── Sync audio ────────────────────────────────────────────────────────────────
+function syncAudioParams() {
+  if (!audioCtx || !perString.length) return;
+  const now = audioCtx.currentTime;
+  strings.forEach((s,i) => {
+    perString[i].delay.delayTime.setTargetAtTime(1/s.pitch, now, 0.015);
+    perString[i].feedback.gain.setTargetAtTime(s.active?s.decay:0, now, 0.015);
+    perString[i].damper.frequency.setTargetAtTime(s.damping, now, 0.015);
+    perString[i].wetGain.gain.setTargetAtTime(s.active?masterWet/6:0, now, 0.015);
+  });
+  if (masterGainNode) masterGainNode.gain.setTargetAtTime(masterGain, now, 0.015);
+  if (dryGainNode)    dryGainNode.gain.setTargetAtTime(1-masterWet, now, 0.015);
+}
+
+// ── Audio engine ─────────────────────────────────────────────────────────────
+async function toggleAudio() {
+  if (audioCtx) { stopAudio(); return; }
+
+  const btn = document.getElementById('engage-btn');
+  btn.textContent = '… STARTING';
+  btn.style.borderColor = '#5a3804';
+  btn.style.color = '#5a3804';
+  showError('');
+
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('Web Audio API not available.');
+
+    audioCtx = new AC({sampleRate:44100});
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false},
+        video:false
+      });
+    } catch(e) {
+      throw new Error('Mic denied -- Settings → Privacy → Microphone → Safari → On');
+    }
+
+    const src = audioCtx.createMediaStreamSource(micStream);
+
+    const inAnalyser = audioCtx.createAnalyser(); inAnalyser.fftSize=256;
+    src.connect(inAnalyser);
+
+    masterGainNode = audioCtx.createGain(); masterGainNode.gain.value=masterGain;
+    masterAnalyser = audioCtx.createAnalyser(); masterAnalyser.fftSize=2048;
+    masterGainNode.connect(masterAnalyser);
+    masterAnalyser.connect(audioCtx.destination);
+
+    dryGainNode = audioCtx.createGain(); dryGainNode.gain.value=1-masterWet;
+    src.connect(dryGainNode); dryGainNode.connect(masterGainNode);
+
+    perString.length=0;
+    for (let i=0;i<6;i++) {
+      const s=strings[i];
+      const delay=audioCtx.createDelay(2.0); delay.delayTime.value=1/s.pitch;
+      const feedback=audioCtx.createGain(); feedback.gain.value=s.active?s.decay:0;
+      const damper=audioCtx.createBiquadFilter(); damper.type='lowpass'; damper.frequency.value=s.damping;
+      const wetGain=audioCtx.createGain(); wetGain.gain.value=s.active?masterWet/6:0;
+      src.connect(delay); delay.connect(damper); damper.connect(feedback);
+      feedback.connect(delay); damper.connect(wetGain); wetGain.connect(masterGainNode);
+      const an=audioCtx.createAnalyser(); an.fftSize=512;
+      damper.connect(an); strAnalysers[i]=an;
+      perString.push({delay,feedback,damper,wetGain});
+    }
+
+    // RMS LEDs
+    const inBuf=new Float32Array(inAnalyser.fftSize);
+    const strBufs=Array.from({length:6},(_,i)=>new Float32Array(strAnalysers[i].fftSize));
+    rmsTimer = setInterval(()=>{
+      inAnalyser.getFloatTimeDomainData(inBuf);
+      const inRms=rms(inBuf);
+      setLED('led-mic', inRms>0.003, GREEN);
+      strBufs.forEach((buf,i)=>{
+        strAnalysers[i].getFloatTimeDomainData(buf);
+        const r=rms(buf); const hot=r>0.004&&strings[i].active;
+        setLED(`led-str-${i}`,hot,STRING_COLORS[i].wave);
+        setLED(`led-bot-${i}`,hot,STRING_COLORS[i].wave);
+        document.getElementById(`row-${i}`).style.borderColor=hot?STRING_COLORS[i].wave+'55':BORDER;
+      });
+    },60);
+
+    startScopes();
+
+    btn.textContent='■ STOP';
+    btn.style.borderColor='#5a1a1a'; btn.style.color='#c04040';
+    btn.style.background='transparent'; btn.style.boxShadow='none';
+    setLED('led-run', true, AMBER);
+
+  } catch(e) {
+    showError(e.message);
+    btn.textContent='▶ ENGAGE';
+    btn.style.borderColor=AMBER; btn.style.color=AMBER;
+    btn.style.background='rgba(232,146,10,0.10)';
+    micStream?.getTracks().forEach(t=>t.stop()); micStream=null;
+    audioCtx?.close(); audioCtx=null;
+  }
+}
+
+function stopAudio() {
+  clearInterval(rmsTimer);
+  stopScopes();
+  micStream?.getTracks().forEach(t=>t.stop()); micStream=null;
+  audioCtx?.close(); audioCtx=null;
+  masterGainNode=null; dryGainNode=null; masterAnalyser=null;
+  perString.length=0;
+  for(let i=0;i<6;i++) strAnalysers[i]=null;
+  const btn=document.getElementById('engage-btn');
+  btn.textContent='▶ ENGAGE'; btn.style.borderColor=AMBER;
+  btn.style.color=AMBER; btn.style.background='rgba(232,146,10,0.10)';
+  btn.style.boxShadow='0 0 16px rgba(232,146,10,0.10)';
+  setLED('led-run',false,AMBER); setLED('led-mic',false,GREEN);
+  for(let i=0;i<6;i++){
+    setLED(`led-str-${i}`,false,STRING_COLORS[i].wave);
+    setLED(`led-bot-${i}`,false,STRING_COLORS[i].wave);
+    document.getElementById(`row-${i}`).style.borderColor=BORDER;
+    blankScope(document.getElementById(`scope-${i}`));
+  }
+  blankScope(document.getElementById('master-scope'));
+}
+
+// ── Scope drawing ─────────────────────────────────────────────────────────────
+function rms(buf) { return Math.sqrt(buf.reduce((s,v)=>s+v*v,0)/buf.length); }
+
+function blankScope(canvas) {
+  if (!canvas) return;
+  const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+  ctx.fillStyle=SCOPE_BG; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+}
+
+function drawWave(ctx, W, H, buf, color, glow, isMaster) {
+  const bright=Math.min(1, rms(buf)*28);
+  ctx.fillStyle=SCOPE_BG; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=isMaster?'#0a1e0a':'rgba(255,255,255,0.03)';
+  ctx.lineWidth=0.5;
+  [H/4,H/2,3*H/4].forEach(y=>{ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();});
+  [W/4,W/2,3*W/4].forEach(x=>{ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();});
+  if (bright>0.01) {
+    ctx.strokeStyle=color;
+    ctx.globalAlpha=isMaster?1:0.25+bright*0.75;
+    ctx.lineWidth=isMaster?2:1.8;
+    ctx.shadowColor=glow; ctx.shadowBlur=bright*(isMaster?8:12);
+    ctx.beginPath();
+    for(let i=0;i<W;i++){
+      const s=buf[Math.floor(i*buf.length/W)];
+      const y=(1-(s*0.85+1)/2)*H;
+      i===0?ctx.moveTo(i,y):ctx.lineTo(i,y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha=1; ctx.shadowBlur=0;
+  } else {
+    ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.stroke();
+  }
+}
+
+function startScopes() {
+  stopScopes();
+  const mc=document.getElementById('master-scope');
+  const mCtx=mc.getContext('2d'); const mW=mc.width, mH=mc.height;
+  const mBuf=new Float32Array(masterAnalyser.fftSize);
+  const scs=Array.from({length:6},(_,i)=>document.getElementById(`scope-${i}`));
+  const sCtxs=scs.map(c=>c.getContext('2d'));
+  const sBufs=Array.from({length:6},(_,i)=>new Float32Array(strAnalysers[i].fftSize));
+
+  function frame() {
+    scopeRAF=requestAnimationFrame(frame);
+    masterAnalyser.getFloatTimeDomainData(mBuf);
+    drawWave(mCtx,mW,mH,mBuf,GREEN,GREEN,true);
+    for(let i=0;i<6;i++){
+      const c=scs[i];
+      if(!strAnalysers[i]||!strings[i].active){blankScope(c);continue;}
+      strAnalysers[i].getFloatTimeDomainData(sBufs[i]);
+      drawWave(sCtxs[i],c.width,c.height,sBufs[i],STRING_COLORS[i].wave,STRING_COLORS[i].glow,false);
+    }
+  }
+  frame();
+}
+function stopScopes(){if(scopeRAF){cancelAnimationFrame(scopeRAF);scopeRAF=null;}}
+
+function showError(msg){
+  const el=document.getElementById('error-msg');
+  el.textContent=msg; el.style.display=msg?'block':'none';
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+buildUI();
+</script>
+</body>
+</html>
