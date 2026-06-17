@@ -177,7 +177,12 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
 
     <div id="right-panel">
       <div>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:7px;color:#8a8480;letter-spacing:3px;margin-bottom:6px;">MASTER OUT</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:7px;color:#8a8480;letter-spacing:3px;margin-bottom:4px;">MIC IN</div>
+        <div style="height:50px;flex-shrink:0;"><canvas id="input-scope" width="300" height="100" style="width:100%;height:100%;display:block;border-radius:4px;border:1px solid #242424;background:#040a04;"></canvas></div>
+      </div>
+      <div class="divider"></div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:7px;color:#8a8480;letter-spacing:3px;margin-bottom:4px;">MASTER OUT</div>
         <div id="master-scope-wrap"><canvas id="master-scope" width="300" height="160"></canvas></div>
       </div>
       <div class="divider"></div>
@@ -191,7 +196,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16m</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16n</div>
     </div>
   </div>
 
@@ -262,6 +267,7 @@ let masterGainNode=null, dryGainNode=null, masterAnalyser=null;
 let masterCompressor=null;
 // ── Noise gate: single GainNode on the input, driven by RMS poll ──────────────
 let inputGateNode=null;
+let inAnalyser=null;
 let gateGain=0;          // current smoothed gate value (0–1)
 const GATE_THRESH  = 0.002;  // RMS threshold — tuned for iPad built-in mic
 const GATE_ATTACK  = 0.05;   // attack  time constant — fast open
@@ -523,7 +529,7 @@ async function toggleAudio() {
 
     const src = audioCtx.createMediaStreamSource(micStream);
 
-    const inAnalyser = audioCtx.createAnalyser();
+    inAnalyser = audioCtx.createAnalyser();
     inAnalyser.fftSize = 512;
     inAnalyser.smoothingTimeConstant = 0;
 
@@ -663,7 +669,7 @@ function stopAudio() {
   stopScopes();
   micStream?.getTracks().forEach(t=>t.stop()); micStream=null;
   audioCtx?.close(); audioCtx=null;
-  masterGainNode=null; dryGainNode=null; masterAnalyser=null; masterCompressor=null; inputGateNode=null;
+  masterGainNode=null; dryGainNode=null; masterAnalyser=null; masterCompressor=null; inputGateNode=null; inAnalyser=null;
   document.getElementById('input-picker-wrap').style.display = 'none';
   document.getElementById('input-picker-label').textContent = 'IN';
   perString.length=0;
@@ -680,6 +686,7 @@ function stopAudio() {
     blankScope(document.getElementById(`scope-${i}`));
   }
   blankScope(document.getElementById('master-scope'));
+  blankScope(document.getElementById('input-scope'));
 }
 
 // ── Scope drawing ─────────────────────────────────────────────────────────────
@@ -721,6 +728,9 @@ function drawWave(ctx, W, H, buf, color, glow, isMaster) {
 
 function startScopes() {
   stopScopes();
+  const ic=document.getElementById('input-scope');
+  const iCtx=ic ? ic.getContext('2d') : null;
+  const iBuf=new Uint8Array(inAnalyser ? inAnalyser.fftSize : 512);
   const mc=document.getElementById('master-scope');
   const mCtx=mc.getContext('2d'); const mW=mc.width, mH=mc.height;
   const mBuf=new Float32Array(masterAnalyser.fftSize);
@@ -730,6 +740,20 @@ function startScopes() {
 
   function frame() {
     scopeRAF=requestAnimationFrame(frame);
+    // Input scope — byte data, amber color
+    if (iCtx && inAnalyser) {
+      inAnalyser.getByteTimeDomainData(iBuf);
+      const W=ic.width, H=ic.height;
+      iCtx.fillStyle=SCOPE_BG; iCtx.fillRect(0,0,W,H);
+      iCtx.strokeStyle=AMBER; iCtx.lineWidth=1.5; iCtx.globalAlpha=0.9;
+      iCtx.beginPath();
+      for(let i=0;i<W;i++){
+        const v=(iBuf[Math.floor(i*iBuf.length/W)]-128)/128;
+        const y=(1-(v*4+1)/2)*H; // scale up 4x so quiet mic is visible
+        i===0?iCtx.moveTo(i,y):iCtx.lineTo(i,y);
+      }
+      iCtx.stroke(); iCtx.globalAlpha=1;
+    }
     masterAnalyser.getFloatTimeDomainData(mBuf);
     drawWave(mCtx,mW,mH,mBuf,GREEN,GREEN,true);
     for(let i=0;i<6;i++){
