@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -526,22 +526,17 @@ async function toggleAudio() {
     const inAnalyser = audioCtx.createAnalyser();
     inAnalyser.fftSize = 512;
     inAnalyser.smoothingTimeConstant = 0;
-    // Connect through a silent gain so Safari actually processes the analyser
-    const meterGain = audioCtx.createGain();
-    meterGain.gain.value = 0;
-    src.connect(meterGain);
-    meterGain.connect(inAnalyser);
-    inAnalyser.connect(audioCtx.destination);
 
     // ── Noise gate ────────────────────────────────────────────────────────────
-    // Single GainNode between mic source and all downstream paths.
-    // Gain is smoothed to 1 when RMS > GATE_THRESH, back to 0 when below,
-    // with separate attack and release time constants (set at top of file).
-    // The dry path also passes through the gate.
     inputGateNode = audioCtx.createGain();
     inputGateNode.gain.value = 0;
     gateGain = 0;
     src.connect(inputGateNode);
+
+    // Tap analyser off inputGateNode — it's in the live graph so Safari
+    // won't optimize it away. Meter reads gate output (≈ mic when open).
+    // For pre-gate metering we also connect src directly to inAnalyser.
+    src.connect(inAnalyser);
 
     // ── FIX 4: Master compressor — gentle, transparent, prevents output clip ──
     // Threshold -18 dB, fast attack (3 ms), slow release (250 ms), 4:1 ratio.
@@ -563,6 +558,9 @@ async function toggleAudio() {
 
     dryGainNode = audioCtx.createGain(); dryGainNode.gain.value=1-masterWet;
     inputGateNode.connect(dryGainNode); dryGainNode.connect(masterGainNode);
+
+    // Connect inAnalyser into the output graph so Safari processes it
+    inAnalyser.connect(masterGainNode);
 
     // Pre-compute limiter curve (shared across all strings)
     const limiterCurve = makeLimiterCurve(4096);
