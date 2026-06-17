@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -196,7 +196,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16n</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16o</div>
     </div>
   </div>
 
@@ -275,6 +275,8 @@ const GATE_RELEASE = 0.8;    // release time constant — slow close, lets strin
 // Derived per-tick coefficients (tick = 60 ms = 0.06 s)
 const GATE_ATK_COEF = Math.exp(-0.06 / GATE_ATTACK);   // ≈ 0.67
 const GATE_REL_COEF = Math.exp(-0.06 / GATE_RELEASE);  // ≈ 0.30
+let silentTicks = 0;                  // counts 60ms ticks since last real input
+const SILENCE_TIMEOUT_MS = 2500;       // after this long silent, force feedback to 0
 const perString    = [];
 const strAnalysers = Array(6).fill(null);
 
@@ -537,6 +539,7 @@ async function toggleAudio() {
     inputGateNode = audioCtx.createGain();
     inputGateNode.gain.value = 0;
     gateGain = 0;
+    silentTicks = 0;
     src.connect(inputGateNode);
 
     // Tap analyser off inputGateNode — it's in the live graph so Safari
@@ -638,6 +641,26 @@ async function toggleAudio() {
       const coef   = target > gateGain ? GATE_ATK_COEF : GATE_REL_COEF;
       gateGain = target + coef * (gateGain - target);   // one-pole smoother
       if (inputGateNode) inputGateNode.gain.setTargetAtTime(gateGain, audioCtx.currentTime, 0.005);
+
+      // ── Anti-self-oscillation watchdog ───────────────────────────────────
+      // Tracks how long it's been since real input was last seen. Normal
+      // note ring-out (gateGain decaying over ~0.8s) is unaffected. Only
+      // after SILENCE_TIMEOUT of continuous silence do we forcibly zero each
+      // string's feedback gain, which kills any self-sustaining oscillation
+      // that isn't tied to actual mic energy.
+      if (target > 0) { silentTicks = 0; }
+      else { silentTicks++; }
+      const silentMs = silentTicks * 60;
+      if (silentMs > SILENCE_TIMEOUT_MS) {
+        perString.forEach((p, i) => {
+          p.feedback.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+        });
+      } else {
+        perString.forEach((p, i) => {
+          const targetDecay = strings[i].active ? strings[i].decay : 0;
+          p.feedback.gain.setTargetAtTime(targetDecay, audioCtx.currentTime, 0.02);
+        });
+      }
       strBufs.forEach((buf,i)=>{
         strAnalysers[i].getFloatTimeDomainData(buf);
         const r=rms(buf); const hot=r>0.004&&strings[i].active;
