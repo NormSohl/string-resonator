@@ -8,7 +8,6 @@
 <meta name="apple-mobile-web-app-title" content="String Resonator">
 <meta name="theme-color" content="#080808">
 <title>String Resonator</title>
-<!-- Inline SVG icon for home screen -->
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23111111'/%3E%3C!-- 6 strings --%3E%3Cline x1='30' y1='50' x2='150' y2='50' stroke='%23ff5533' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='66' x2='150' y2='66' stroke='%23e8920a' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='82' x2='150' y2='82' stroke='%23c8e80a' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='98' x2='150' y2='98' stroke='%230ae84a' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='114' x2='150' y2='114' stroke='%230ae8c8' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='30' y1='130' x2='150' y2='130' stroke='%233a8aff' stroke-width='3' stroke-linecap='round'/%3E%3C!-- Waveform on string 4 --%3E%3Cpolyline points='30,98 50,88 65,108 80,88 95,108 110,88 125,108 150,98' fill='none' stroke='%230ae84a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;500;700&display=swap" rel="stylesheet">
 <style>
@@ -207,13 +206,15 @@ function hzToNote(hz) {
 }
 function fmtDamp(v) { return v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)+''; }
 
+// ── FIX 1: Lower default decay values (was 0.92–0.97, now 0.80–0.88) ─────────
+// Higher-pitched strings get lower decay — they accumulate energy faster.
 const strings = [
-  {pitch:82.4,  decay:0.97, damping:3200, active:true},
-  {pitch:110.0, decay:0.96, damping:2900, active:true},
-  {pitch:146.8, decay:0.95, damping:2600, active:true},
-  {pitch:196.0, decay:0.94, damping:2400, active:true},
-  {pitch:246.9, decay:0.93, damping:2200, active:true},
-  {pitch:329.6, decay:0.92, damping:2000, active:true},
+  {pitch:82.4,  decay:0.88, damping:3200, active:true},  // E2  (was 0.97)
+  {pitch:110.0, decay:0.87, damping:2900, active:true},  // A2  (was 0.96)
+  {pitch:146.8, decay:0.86, damping:2600, active:true},  // D3  (was 0.95)
+  {pitch:196.0, decay:0.84, damping:2400, active:true},  // G3  (was 0.94)
+  {pitch:246.9, decay:0.82, damping:2200, active:true},  // B3  (was 0.93)
+  {pitch:329.6, decay:0.80, damping:2000, active:true},  // E4  (was 0.92)
 ];
 let masterWet  = 0.75;
 let masterGain = 0.85;
@@ -221,6 +222,8 @@ let masterGain = 0.85;
 // Audio nodes
 let audioCtx=null, micStream=null, rmsTimer=null, scopeRAF=null;
 let masterGainNode=null, dryGainNode=null, masterAnalyser=null;
+// ── FIX 4: Master compressor node ─────────────────────────────────────────────
+let masterCompressor=null;
 const perString    = [];
 const strAnalysers = Array(6).fill(null);
 
@@ -283,12 +286,10 @@ function buildUI() {
   strings.forEach((s, i) => {
     const sc = STRING_COLORS[i];
 
-    // Row
     const row = document.createElement('div');
     row.className = 'string-row';
     row.id = `row-${i}`;
 
-    // Label col
     const lc = document.createElement('div');
     lc.className = 'str-label-col';
     const led = document.createElement('div');
@@ -299,7 +300,6 @@ function buildUI() {
     btn.addEventListener('click', () => toggleString(i));
     lc.appendChild(led); lc.appendChild(btn);
 
-    // Scope
     const sw = document.createElement('div');
     sw.className = 'scope-wrap';
     const canvas = document.createElement('canvas');
@@ -307,7 +307,6 @@ function buildUI() {
     canvas.width=400; canvas.height=120;
     sw.appendChild(canvas);
 
-    // Knobs
     const kg = document.createElement('div');
     kg.className = 'knobs-group';
 
@@ -356,10 +355,8 @@ function buildUI() {
     row.appendChild(lc); row.appendChild(sw); row.appendChild(kg);
     col.appendChild(row);
 
-    // Blank scope
     blankScope(canvas);
 
-    // Bottom LED
     const bd = document.createElement('div'); bd.className='bottom-string';
     const bl = document.createElement('div'); bl.className='led'; bl.id=`led-bot-${i}`;
     const bn = document.createElement('span'); bn.className='bottom-note';
@@ -383,7 +380,6 @@ function buildUI() {
     syncAudioParams();
   });
 
-  // Engage button
   document.getElementById('engage-btn').addEventListener('click', toggleAudio);
 }
 
@@ -407,10 +403,25 @@ function syncAudioParams() {
     perString[i].delay.delayTime.setTargetAtTime(1/s.pitch, now, 0.015);
     perString[i].feedback.gain.setTargetAtTime(s.active?s.decay:0, now, 0.015);
     perString[i].damper.frequency.setTargetAtTime(s.damping, now, 0.015);
+    // ── FIX 2: limiter curve is baked into the WaveShaperNode at build time;
+    //    no per-param update needed here.
     perString[i].wetGain.gain.setTargetAtTime(s.active?masterWet/6:0, now, 0.015);
   });
   if (masterGainNode) masterGainNode.gain.setTargetAtTime(masterGain, now, 0.015);
   if (dryGainNode)    dryGainNode.gain.setTargetAtTime(1-masterWet, now, 0.015);
+}
+
+// ── FIX 2: Hard limiter waveshaper curve ─────────────────────────────────────
+// Soft-clip curve: tanh-based, starts gently limiting above ~±0.7,
+// hard-clamps at ±1.0. Applied inside each feedback loop after the damper.
+function makeLimiterCurve(nSamples) {
+  const curve = new Float32Array(nSamples);
+  for (let i = 0; i < nSamples; i++) {
+    const x = (i * 2) / (nSamples - 1) - 1;   // -1 … +1
+    // tanh soft-clip: gentle until ~0.7, asymptotes at ±1
+    curve[i] = Math.tanh(2.5 * x) / Math.tanh(2.5);
+  }
+  return curve;
 }
 
 // ── Audio engine ─────────────────────────────────────────────────────────────
@@ -444,26 +455,73 @@ async function toggleAudio() {
     const inAnalyser = audioCtx.createAnalyser(); inAnalyser.fftSize=256;
     src.connect(inAnalyser);
 
+    // ── FIX 4: Master compressor — gentle, transparent, prevents output clip ──
+    // Threshold -18 dB, fast attack (3 ms), slow release (250 ms), 4:1 ratio.
+    // Knee 6 dB keeps it musical. This is a last-resort safety net, not a limiter.
+    masterCompressor = audioCtx.createDynamicsCompressor();
+    masterCompressor.threshold.value = -18;   // dB: starts compressing here
+    masterCompressor.knee.value       =   6;  // dB: soft knee width
+    masterCompressor.ratio.value      =   4;  // 4:1 above threshold
+    masterCompressor.attack.value     = 0.003; // 3 ms
+    masterCompressor.release.value    = 0.25;  // 250 ms
+
     masterGainNode = audioCtx.createGain(); masterGainNode.gain.value=masterGain;
     masterAnalyser = audioCtx.createAnalyser(); masterAnalyser.fftSize=2048;
-    masterGainNode.connect(masterAnalyser);
+
+    // Signal chain: masterGainNode → compressor → analyser → destination
+    masterGainNode.connect(masterCompressor);
+    masterCompressor.connect(masterAnalyser);
     masterAnalyser.connect(audioCtx.destination);
 
     dryGainNode = audioCtx.createGain(); dryGainNode.gain.value=1-masterWet;
     src.connect(dryGainNode); dryGainNode.connect(masterGainNode);
 
+    // Pre-compute limiter curve (shared across all strings)
+    const limiterCurve = makeLimiterCurve(4096);
+
     perString.length=0;
     for (let i=0;i<6;i++) {
       const s=strings[i];
+
       const delay=audioCtx.createDelay(2.0); delay.delayTime.value=1/s.pitch;
-      const feedback=audioCtx.createGain(); feedback.gain.value=s.active?s.decay:0;
+
+      // ── FIX 3: DC blocking highpass at 20 Hz after the delay ─────────────
+      // Removes DC offset accumulation that would walk the feedback loop's
+      // operating point away from zero and eventually saturate.
+      const dcBlock = audioCtx.createBiquadFilter();
+      dcBlock.type = 'highpass';
+      dcBlock.frequency.value = 20;   // Hz — below any audible content
+      dcBlock.Q.value = 0.707;        // Butterworth (maximally flat passband)
+
       const damper=audioCtx.createBiquadFilter(); damper.type='lowpass'; damper.frequency.value=s.damping;
+
+      // ── FIX 2: Hard limiter WaveShaperNode in the feedback path ──────────
+      // Sits between damper output and feedback gain to prevent runaway.
+      const limiter = audioCtx.createWaveShaper();
+      limiter.curve = limiterCurve;
+      limiter.oversample = '4x';  // reduces aliasing from the nonlinearity
+
+      const feedback=audioCtx.createGain(); feedback.gain.value=s.active?s.decay:0;
       const wetGain=audioCtx.createGain(); wetGain.gain.value=s.active?masterWet/6:0;
-      src.connect(delay); delay.connect(damper); damper.connect(feedback);
-      feedback.connect(delay); damper.connect(wetGain); wetGain.connect(masterGainNode);
+
+      // Feedback loop: delay → dcBlock → damper → limiter → feedback → delay
+      // (dcBlock and limiter are in the loop; wetGain taps off post-damper)
+      src.connect(delay);
+      delay.connect(dcBlock);
+      dcBlock.connect(damper);
+      damper.connect(limiter);
+      limiter.connect(feedback);
+      feedback.connect(delay);
+
+      // Wet tap comes from post-damper (same as before), before the limiter
+      // so the output still reflects the natural string tone.
+      damper.connect(wetGain);
+      wetGain.connect(masterGainNode);
+
       const an=audioCtx.createAnalyser(); an.fftSize=512;
       damper.connect(an); strAnalysers[i]=an;
-      perString.push({delay,feedback,damper,wetGain});
+
+      perString.push({delay, dcBlock, damper, limiter, feedback, wetGain});
     }
 
     // RMS LEDs
@@ -504,7 +562,7 @@ function stopAudio() {
   stopScopes();
   micStream?.getTracks().forEach(t=>t.stop()); micStream=null;
   audioCtx?.close(); audioCtx=null;
-  masterGainNode=null; dryGainNode=null; masterAnalyser=null;
+  masterGainNode=null; dryGainNode=null; masterAnalyser=null; masterCompressor=null;
   perString.length=0;
   for(let i=0;i<6;i++) strAnalysers[i]=null;
   const btn=document.getElementById('engage-btn');
