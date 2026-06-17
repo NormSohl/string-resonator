@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-16y -->
+<!-- Multi-String Resonator v2026-06-16z -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -197,7 +197,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16y</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-16z</div>
     </div>
   </div>
 
@@ -268,6 +268,7 @@ let masterCompressor=null;
 let inputGateNode=null;   // opens once at engage; runaway prevention is the watchdog below
 let inAnalyser=null;
 let silentTicks = 0;                   // counts 60ms ticks since last real input
+let watchdogFired = false;             // one-shot flag for the silence cutoff
 const SILENCE_TIMEOUT_MS = 1500;       // after this long silent, force feedback to 0
 const perString    = [];
 const strAnalysers = Array(6).fill(null);
@@ -523,6 +524,7 @@ async function toggleAudio() {
     inputGateNode = audioCtx.createGain();
     inputGateNode.gain.value = 0;
     silentTicks = 0;
+    watchdogFired = false;
     src.connect(inputGateNode);
 
     src.connect(inAnalyser);
@@ -622,22 +624,27 @@ async function toggleAudio() {
       });
 
       // Watchdog: real input (mic or resulting string energy) resets the
-      // silence counter and keeps feedback at its proper decay value.
-      // After SILENCE_TIMEOUT_MS of true silence, feedback is forced to 0,
-      // guaranteeing the loops can never sustain themselves indefinitely.
+      // silence counter. Feedback gain is only touched on the silent→active
+      // or active→silent transition — re-issuing the same ramp every tick
+      // was causing small periodic glitches in the waveform.
       const inputPresent = inRms > 0.0015 || maxStrRms > 0.003;
       if (inputPresent) {
+        if (silentTicks > 0) {
+          // Just transitioned from silence back to active — restore feedback
+          perString.forEach((p, i) => {
+            const d = strings[i].active ? strings[i].decay : 0;
+            p.feedback.gain.setTargetAtTime(d, audioCtx.currentTime, 0.02);
+          });
+        }
         silentTicks = 0;
-        perString.forEach((p, i) => {
-          const d = strings[i].active ? strings[i].decay : 0;
-          p.feedback.gain.setTargetAtTime(d, audioCtx.currentTime, 0.02);
-        });
+        watchdogFired = false;
       } else {
         silentTicks++;
-        if (silentTicks * 60 > SILENCE_TIMEOUT_MS) {
+        if (!watchdogFired && silentTicks * 60 > SILENCE_TIMEOUT_MS) {
           perString.forEach((p) => {
             p.feedback.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
           });
+          watchdogFired = true;
         }
       }
     },60);
