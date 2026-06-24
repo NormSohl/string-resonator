@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-25b -->
+<!-- Multi-String Resonator v2026-06-25c -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -222,7 +222,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-25b</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-25c</div>
     </div>
   </div>
 
@@ -487,7 +487,7 @@ function syncAudioParams() {
     perString[i].wetGain.gain.setTargetAtTime(s.active?wg:0, now, 0.015);
   });
   if (masterGainNode) masterGainNode.gain.setTargetAtTime(masterGain, now, 0.015);
-  if (dryGainNode)    dryGainNode.gain.setTargetAtTime((1-masterWet)*0.02, now, 0.015);
+  if (dryGainNode)    dryGainNode.gain.setTargetAtTime(0, now, 0.015);
 }
 
 // ── Audio engine ─────────────────────────────────────────────────────────────
@@ -582,14 +582,14 @@ async function toggleAudio() {
     hardClip.connect(masterAnalyser);
     masterAnalyser.connect(audioCtx.destination);
 
-    dryGainNode = audioCtx.createGain(); dryGainNode.gain.value=(1-masterWet)*0.02;
+    dryGainNode = audioCtx.createGain(); dryGainNode.gain.value=0;
     inputGateNode.connect(dryGainNode); dryGainNode.connect(masterGainNode);
 
     // Input trim — attenuates raw mic signal before it hits the comb loops.
     // Mic line level can be much hotter than these resonators were tuned for;
     // this brings excitation down to a sane operating point.
     inputTrim = audioCtx.createGain();
-    inputTrim.gain.value = 0.20;
+    inputTrim.gain.value = 0.80;
     inputGateNode.connect(inputTrim);
 
     perString.length=0;
