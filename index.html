@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24a -->
+<!-- Multi-String Resonator v2026-06-24b -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -197,7 +197,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24a</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24b</div>
     </div>
   </div>
 
@@ -275,6 +275,7 @@ let inAnalyser=null;
 let silentTicks = 0;                   // counts 60ms ticks since last real input
 let watchdogFired = false;             // one-shot flag for the silence cutoff
 const SILENCE_TIMEOUT_MS = 1500;       // after this long silent, force feedback to 0
+const MIC_ACTIVE_THRESHOLD = 0.010;   // inRms above this = real input (tune above ambient floor)
 const perString    = [];
 const strAnalysers = Array(6).fill(null);
 
@@ -615,7 +616,7 @@ async function toggleAudio() {
         sum += v * v;
       }
       const inRms = Math.sqrt(sum / inBuf.length);
-      setLED('led-mic', inRms>0.001, GREEN);
+      setLED('led-mic', inRms>MIC_ACTIVE_THRESHOLD, GREEN);
       const rmsEl = document.getElementById('rms-readout');
       if (rmsEl) rmsEl.textContent = `MIC: ${inRms.toFixed(4)}`;
 
@@ -634,7 +635,7 @@ async function toggleAudio() {
       // here created a self-defeating loop where ringing strings prevented the
       // watchdog from ever firing, and a fired watchdog was immediately undone
       // by the still-ringing strings restoring feedback on the next tick.
-      const inputPresent = inRms > 0.0015;
+      const inputPresent = inRms > MIC_ACTIVE_THRESHOLD;
       if (inputPresent) {
         if (silentTicks > 0) {
           // Just transitioned from silence back to active — restore feedback
