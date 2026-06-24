@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24p -->
+<!-- Multi-String Resonator v2026-06-24q -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -222,7 +222,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24p</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24q</div>
     </div>
   </div>
 
@@ -583,7 +583,7 @@ async function toggleAudio() {
     // Mic line level can be much hotter than these resonators were tuned for;
     // this brings excitation down to a sane operating point.
     inputTrim = audioCtx.createGain();
-    inputTrim.gain.value = 0.02;
+    inputTrim.gain.value = 0.04;
     inputGateNode.connect(inputTrim);
 
     perString.length=0;
@@ -720,9 +720,9 @@ function toggleMicMute() {
   }
 }
 
-// ── Test sweep — bypasses mic gate, sweeps 80→340 Hz into all active strings ──
+// ── Test sweep — bypasses inputTrim, connects directly to each string's delay ──
 function runTestSweep() {
-  if (!audioCtx || !inputTrim) return;
+  if (!audioCtx || !perString.length) return;
   const btn = document.getElementById('sweep-btn');
   btn.disabled = true;
 
@@ -736,12 +736,14 @@ function runTestSweep() {
   osc.frequency.exponentialRampToValueAtTime(340, t0 + dur);
 
   env.gain.setValueAtTime(0, t0);
-  env.gain.linearRampToValueAtTime(1.0, t0 + 0.02);
-  env.gain.setValueAtTime(1.0, t0 + dur - 0.05);
+  env.gain.linearRampToValueAtTime(0.5, t0 + 0.02);
+  env.gain.setValueAtTime(0.5, t0 + dur - 0.05);
   env.gain.linearRampToValueAtTime(0, t0 + dur);
 
   osc.connect(env);
-  env.connect(inputTrim);   // bypass gate — direct into string inputs
+  // Connect directly to each active string's delay — bypasses inputTrim so
+  // sweep level is independent of mic sensitivity.
+  perString.forEach((s, i) => { if (strings[i].active) env.connect(s.delay); });
   osc.start(t0);
   osc.stop(t0 + dur + 0.1);
   osc.onended = () => { btn.disabled = false; };
