@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24g -->
+<!-- Multi-String Resonator v2026-06-24h -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -197,7 +197,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24g</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24h</div>
     </div>
   </div>
 
@@ -269,8 +269,7 @@ let masterGainNode=null, dryGainNode=null, masterAnalyser=null;
 let masterCompressor=null;
 let inputGateNode=null;   // gated by mic level — closed when quiet to block room noise
 let inAnalyser=null;
-const MIC_ACTIVE_THRESHOLD = 0.010;   // inRms above this = real input; tune above ambient floor
-const STR_GATE_THRESHOLD  = 0.10;    // close input gate when any string exceeds this RMS
+const MIC_ACTIVE_THRESHOLD = 0.025;   // real voice ~0.1+ RMS; TRRS coupling residue ~0.009-0.015
 let prevInputPresent = false;          // tracks last gate state to avoid setTargetAtTime spam
 const perString    = [];
 const strAnalysers = Array(6).fill(null);
@@ -612,31 +611,26 @@ async function toggleAudio() {
       const rmsEl = document.getElementById('rms-readout');
       if (rmsEl) rmsEl.textContent = `MIC: ${inRms.toFixed(4)}`;
 
-      // Measure string energy first so maxStrRms feeds the gate decision.
-      let maxStrRms = 0;
+      // Gate: threshold set well above TRRS cable crosstalk (~0.009-0.015 RMS from
+      // headphone output) so coupled residue from ringing strings can't keep the
+      // gate open after voice stops. Strings then decay naturally via physics.
+      const inputPresent = inRms > MIC_ACTIVE_THRESHOLD;
+      setLED('led-mic', inputPresent, GREEN);
+      if (inputPresent !== prevInputPresent) {
+        inputGateNode.gain.setTargetAtTime(
+          inputPresent ? 1 : 0, audioCtx.currentTime, inputPresent ? 0.01 : 0.15
+        );
+        prevInputPresent = inputPresent;
+      }
+
       strBufs.forEach((buf,i)=>{
         strAnalysers[i].getFloatTimeDomainData(buf);
         const r=rms(buf);
-        if (r > maxStrRms) maxStrRms = r;
         const hot=r>0.004&&strings[i].active;
         setLED(`led-str-${i}`,hot,STRING_COLORS[i].wave);
         setLED(`led-bot-${i}`,hot,STRING_COLORS[i].wave);
         document.getElementById(`row-${i}`).style.borderColor=hot?STRING_COLORS[i].wave+'55':BORDER;
       });
-
-      // Gate: open when mic is active; also close when strings are already ringing
-      // to break signal-chain feedback (headphone output leaks into TRRS mic at
-      // ~-20 dB; at 200× resonance gain that keeps inRms above threshold even
-      // after the user stops singing). Strings decay naturally once gate closes.
-      const micActive = inRms > MIC_ACTIVE_THRESHOLD;
-      const gateOpen  = micActive && maxStrRms < STR_GATE_THRESHOLD;
-      setLED('led-mic', micActive, GREEN);
-      if (gateOpen !== prevInputPresent) {
-        inputGateNode.gain.setTargetAtTime(
-          gateOpen ? 1 : 0, audioCtx.currentTime, gateOpen ? 0.01 : 0.15
-        );
-        prevInputPresent = gateOpen;
-      }
     },60);
 
     startScopes();
