@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24z -->
+<!-- Multi-String Resonator v2026-06-25a -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -222,7 +222,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24z</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-25a</div>
     </div>
   </div>
 
@@ -589,7 +589,7 @@ async function toggleAudio() {
     // Mic line level can be much hotter than these resonators were tuned for;
     // this brings excitation down to a sane operating point.
     inputTrim = audioCtx.createGain();
-    inputTrim.gain.value = 0.30;
+    inputTrim.gain.value = 0.20;
     inputGateNode.connect(inputTrim);
 
     perString.length=0;
@@ -604,7 +604,7 @@ async function toggleAudio() {
       const inputFilter = audioCtx.createBiquadFilter();
       inputFilter.type = 'bandpass';
       inputFilter.frequency.value = s.pitch;
-      inputFilter.Q.value = 12;
+      inputFilter.Q.value = 8;
 
       // DC blocking highpass — prevents DC offset from accumulating in the
       // feedback loop and walking the operating point off-center.
