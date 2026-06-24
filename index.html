@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24h -->
+<!-- Multi-String Resonator v2026-06-24i -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -197,7 +197,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24h</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24i</div>
     </div>
   </div>
 
@@ -253,12 +253,12 @@ function fmtDamp(v) { return v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)+'
 // Damping (lowpass) is set at ~4x each string's fundamental so off-pitch
 // energy rolls off rather than sustaining.
 const strings = [
-  {pitch:82.4,  decay:0.979, damping:320,  active:true},  // E2  ~4.0s RT60
-  {pitch:110.0, decay:0.984, damping:420,  active:true},  // A2  ~3.8s
-  {pitch:146.8, decay:0.988, damping:560,  active:true},  // D3  ~3.5s
-  {pitch:196.0, decay:0.991, damping:740,  active:true},  // G3  ~3.2s
-  {pitch:246.9, decay:0.993, damping:920,  active:true},  // B3  ~3.1s
-  {pitch:329.6, decay:0.995, damping:1200, active:true},  // E4  ~3.0s
+  {pitch:82.4,  decay:0.870, damping:320,  active:true},  // E2  ~0.6s RT60
+  {pitch:110.0, decay:0.901, damping:420,  active:true},  // A2  ~0.6s
+  {pitch:146.8, decay:0.925, damping:560,  active:true},  // D3  ~0.6s
+  {pitch:196.0, decay:0.943, damping:740,  active:true},  // G3  ~0.6s
+  {pitch:246.9, decay:0.955, damping:920,  active:true},  // B3  ~0.6s
+  {pitch:329.6, decay:0.966, damping:1200, active:true},  // E4  ~0.6s
 ];
 let masterWet  = 0.75;
 let masterGain = 0.85;
@@ -555,7 +555,7 @@ async function toggleAudio() {
     // Mic line level can be much hotter than these resonators were tuned for;
     // this brings excitation down to a sane operating point.
     const inputTrim = audioCtx.createGain();
-    inputTrim.gain.value = 0.01;
+    inputTrim.gain.value = 0.04;
     inputGateNode.connect(inputTrim);
 
     perString.length=0;
