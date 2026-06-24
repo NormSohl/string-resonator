@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-25n -->
+<!-- Multi-String Resonator v2026-06-25o -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -82,6 +82,18 @@ body {
 #mic-mute-btn.muted {
   background: rgba(90,26,26,0.30);
   border-color: #c04040; color: #c04040;
+}
+#file-btn {
+  padding: 8px 16px;
+  background: rgba(200,232,10,0.10);
+  border: 1px solid #c8e80a;
+  border-radius: 4px; color: #c8e80a;
+  font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 3px;
+  cursor: pointer; transition: all 0.15s;
+  -webkit-appearance: none; white-space: nowrap; display: none;
+}
+#file-btn.playing {
+  background: rgba(200,232,10,0.25);
 }
 
 #input-picker-wrap {
@@ -193,6 +205,8 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
       <div class="indicator"><span class="ind-label">MIC</span><div class="led" id="led-mic"></div></div>
       <div class="indicator"><span class="ind-label">RUN</span><div class="led" id="led-run"></div></div>
       <button id="mic-mute-btn">MIC ON</button>
+      <input type="file" id="audio-file-input" accept="audio/*" style="display:none">
+      <button id="file-btn">▶ FILE</button>
       <button id="sweep-btn">↗ PLUCK</button>
       <button id="engage-btn">▶ ENGAGE</button>
     </div>
@@ -222,7 +236,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-25n</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-25o</div>
     </div>
   </div>
 
@@ -293,6 +307,9 @@ let masterGainNode=null, dryGainNode=null, masterAnalyser=null, inputTrim=null;
 let masterCompressor=null;
 let inputGateNode=null;
 let micMuted = false;
+let fileBuffer = null;
+let fileSource = null;
+let filePlaying = false;
 let inAnalyser=null;
 const MIC_OPEN_THRESHOLD  = 0.060;   // open gate: real voice ~0.1+ RMS, headphone bleed ~0.01-0.04
 const MIC_CLOSE_THRESHOLD = 0.018;   // close gate: only when truly quiet
@@ -456,6 +473,8 @@ function buildUI() {
   document.getElementById('engage-btn').addEventListener('click', toggleAudio);
   document.getElementById('sweep-btn').addEventListener('click', runTestSweep);
   document.getElementById('mic-mute-btn').addEventListener('click', toggleMicMute);
+  document.getElementById('file-btn').addEventListener('click', toggleFileAudio);
+  document.getElementById('audio-file-input').addEventListener('change', onFileSelected);
 }
 
 // ── Toggle string ────────────────────────────────────────────────────────────
@@ -683,6 +702,7 @@ async function toggleAudio() {
     setLED('led-run', true, AMBER);
     document.getElementById('sweep-btn').style.display = 'inline-block';
     document.getElementById('mic-mute-btn').style.display = 'inline-block';
+    document.getElementById('file-btn').style.display = 'inline-block';
 
   } catch(e) {
     showError(e.message);
@@ -703,6 +723,9 @@ function stopAudio() {
   document.getElementById('input-picker-wrap').style.display = 'none';
   document.getElementById('input-picker-label').textContent = 'IN';
   document.getElementById('sweep-btn').style.display = 'none';
+  document.getElementById('file-btn').style.display = 'none';
+  stopFileAudio();
+  fileBuffer = null;
   micMuted = false;
   const mmb = document.getElementById('mic-mute-btn');
   mmb.style.display = 'none'; mmb.textContent = 'MIC ON'; mmb.classList.remove('muted');
@@ -733,6 +756,57 @@ function toggleMicMute() {
     inputGateNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
     prevInputPresent = false;
   }
+}
+
+// ── File audio — loads an audio file and plays it looped into the resonators,
+// bypassing the mic gate. Connects directly to inputTrim.
+function onFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file || !audioCtx) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    audioCtx.decodeAudioData(ev.target.result).then(buf => {
+      fileBuffer = buf;
+      startFileAudio();
+    }).catch(() => showError('Could not decode audio file'));
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';  // allow re-selecting same file
+}
+
+function toggleFileAudio() {
+  if (!audioCtx) return;
+  if (filePlaying) {
+    stopFileAudio();
+  } else {
+    document.getElementById('audio-file-input').click();
+  }
+}
+
+function startFileAudio() {
+  if (!fileBuffer || !inputTrim) return;
+  stopFileAudio();
+  fileSource = audioCtx.createBufferSource();
+  fileSource.buffer = fileBuffer;
+  fileSource.loop = true;
+  fileSource.connect(inputTrim);
+  fileSource.connect(inAnalyser);
+  fileSource.start();
+  filePlaying = true;
+  const btn = document.getElementById('file-btn');
+  btn.textContent = '■ FILE';
+  btn.classList.add('playing');
+}
+
+function stopFileAudio() {
+  if (fileSource) {
+    try { fileSource.stop(); } catch(e) {}
+    try { fileSource.disconnect(); } catch(e) {}
+    fileSource = null;
+  }
+  filePlaying = false;
+  const btn = document.getElementById('file-btn');
+  if (btn) { btn.textContent = '▶ FILE'; btn.classList.remove('playing'); }
 }
 
 // ── Pluck — injects a short noise burst directly into each active string's
