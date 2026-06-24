@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-25c -->
+<!-- Multi-String Resonator v2026-06-25d -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -222,7 +222,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-25c</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-25d</div>
     </div>
   </div>
 
@@ -279,11 +279,11 @@ function fmtDamp(v) { return v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)+'
 // energy rolls off rather than sustaining.
 const strings = [
   {pitch:82.4,  decay:0.720, damping:800,  active:true},  // E2  ~0.25s RT60
-  {pitch:110.0, decay:0.840, damping:420,  active:false}, // A2
-  {pitch:146.8, decay:0.870, damping:560,  active:false}, // D3
-  {pitch:196.0, decay:0.900, damping:740,  active:false}, // G3
-  {pitch:246.9, decay:0.920, damping:920,  active:false}, // B3
-  {pitch:329.6, decay:0.940, damping:1200, active:false}, // E4
+  {pitch:110.0, decay:0.778, damping:1100, active:false}, // A2  ~0.25s RT60
+  {pitch:146.8, decay:0.828, damping:1400, active:false}, // D3  ~0.25s RT60
+  {pitch:196.0, decay:0.868, damping:1900, active:false}, // G3  ~0.25s RT60
+  {pitch:246.9, decay:0.894, damping:2400, active:false}, // B3  ~0.25s RT60
+  {pitch:329.6, decay:0.920, damping:3200, active:false}, // E4  ~0.25s RT60
 ];
 let masterWet  = 0.75;
 let masterGain = 0.85;
