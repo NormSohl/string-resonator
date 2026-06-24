@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24c -->
+<!-- Multi-String Resonator v2026-06-24d -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -197,7 +197,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24c</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24d</div>
     </div>
   </div>
 
@@ -509,8 +509,6 @@ async function toggleAudio() {
     // below is what actually prevents runaway, not this gate.
     inputGateNode = audioCtx.createGain();
     inputGateNode.gain.value = 0;
-    silentTicks = 0;
-    watchdogFired = false;
     src.connect(inputGateNode);
 
     src.connect(inAnalyser);
