@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24e -->
+<!-- Multi-String Resonator v2026-06-24f -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -197,7 +197,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24e</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24f</div>
     </div>
   </div>
 
@@ -571,7 +571,7 @@ async function toggleAudio() {
       dcBlock.frequency.value = 20;
       dcBlock.Q.value = 0.707;
 
-      const damper=audioCtx.createBiquadFilter(); damper.type='lowpass'; damper.frequency.value=s.damping;
+      const damper=audioCtx.createBiquadFilter(); damper.type='lowpass'; damper.frequency.value=s.damping; damper.Q.value=0.707;
 
       const feedback=audioCtx.createGain(); feedback.gain.value = s.active ? s.decay : 0;
       const wetGain=audioCtx.createGain(); wetGain.gain.value=s.active?masterWet/6:0;
