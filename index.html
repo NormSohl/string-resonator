@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Multi-String Resonator v2026-06-24w -->
+<!-- Multi-String Resonator v2026-06-24x -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -222,7 +222,7 @@ canvas#master-scope { width: 100%; height: 100%; display: block; border-radius: 
         <div class="master-knob-val" id="val-gain" style="color:#e8920a">57%</div>
         <div class="master-knob-lbl">OUTPUT</div>
       </div>
-      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24w</div>
+      <div id="panel-credits">6× COMB<br>FILTER<br>PARALLEL<br><br>WEB AUDIO<br><br>v2026-06-24x</div>
     </div>
   </div>
 
@@ -278,7 +278,7 @@ function fmtDamp(v) { return v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)+'
 // Damping (lowpass) is set at ~4x each string's fundamental so off-pitch
 // energy rolls off rather than sustaining.
 const strings = [
-  {pitch:82.4,  decay:0.800, damping:800,  active:true},  // E2  ~0.35s RT60
+  {pitch:82.4,  decay:0.720, damping:800,  active:true},  // E2  ~0.25s RT60
   {pitch:110.0, decay:0.840, damping:420,  active:false}, // A2
   {pitch:146.8, decay:0.870, damping:560,  active:false}, // D3
   {pitch:196.0, decay:0.900, damping:740,  active:false}, // G3
@@ -604,7 +604,7 @@ async function toggleAudio() {
       const inputFilter = audioCtx.createBiquadFilter();
       inputFilter.type = 'bandpass';
       inputFilter.frequency.value = s.pitch;
-      inputFilter.Q.value = 3;
+      inputFilter.Q.value = 6;
 
       // DC blocking highpass — prevents DC offset from accumulating in the
       // feedback loop and walking the operating point off-center.
